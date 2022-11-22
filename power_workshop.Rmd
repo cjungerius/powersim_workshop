@@ -1,0 +1,282 @@
+---
+title: "power_workshop"
+author: "Chris Jungerius"
+date: "11/22/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(afex)
+library(lmerTest)
+library(faux)
+library(broom.mixed)
+
+afex::set_sum_contrasts() # avoids annoying afex message
+## setting contr.sum globally: options(contrasts=c('contr.sum', 'contr.poly'))
+afex_options(include_aov = FALSE) # runs faster
+afex_options(es_aov = "pes") # changes effect size measure to partial eta squared
+```
+
+Before we begin, we can set a seed so the outcome of our random number generators are identical.
+
+```{r}
+set.seed(42)
+x <- rnorm(1)
+x
+```
+
+
+Let's start with the basics:
+rnorm generates a sample from a population with a given mean and standard deviation. For example, to draw 100 samples from a population with mean 6 and sd 2:
+
+```{r}
+n <- 100
+mu <- 6
+sigma <- 2
+  
+sample = rnorm(n, mu, sigma)
+mean(sample)
+sd(sample)
+```
+
+We can also run statistics on these samples - for example, a one-sided t.test to test whether our sample is likely to come from a population with mu = 0
+
+```{r}
+t.test(sample) %>% tidy
+```
+Or a two-sided t.test to test whether two samples are likely to come from the same population
+
+```{r}
+n2 <- 100
+mu2 <- 2
+sigma2 <- 2
+
+sample2 = rnorm(n2, mu2, sigma2)
+t.test(sample,sample2) %>% tidy
+```
+We can combine our sampling from a given population and testing (one-sided for now) into a function for convenience:
+
+```{r}
+draw_and_test <- function(
+  n=10,
+  mu=0,
+  sigma=1
+){
+  
+  sample <- rnorm(n,mu,sigma)
+  result <- tidy(t.test(sample)) %>% 
+    select(estimate, p.value) %>% 
+    mutate(
+      n=n,
+      mu=mu,
+      sigma=sigma
+    )
+  return(result)
+}
+
+draw_and_test(100,1,.5)
+
+```
+
+
+Cool. but what if I want to run, like, 1000 t.tests on samples drawn from a population? And stick the results in a dataframe while I'm at it?
+
+```{r}
+nreps = 1000
+
+params <- crossing(
+  rep = seq(nreps),
+  n = 30,
+  mu = seq(.1,.5,.1),
+  sigma = 1
+) %>% 
+  select(-rep)
+
+sims <- pmap_df(params,draw_and_test)
+```
+
+
+
+```{r}
+sims %>% 
+  ggplot(
+    aes(
+      x = p.value,
+      color = as.factor(mu)
+      )
+  ) +
+  geom_density() +
+  geom_vline(
+    xintercept = .05,
+    linetype = "dashed"
+  )
+
+```
+```{r}
+sims %>% 
+  group_by(mu) %>% 
+  summarise(
+    power = mean(p.value < .05)
+  )
+```
+```{r}
+sims %>% 
+  group_by(mu) %>% 
+  filter(p.value < .05) %>% 
+  summarise(d = mean(estimate))
+```
+So this already demonstrates the basics:
+
+- generate a sample from a virtual population
+- perform your statistical test of choice
+- repeat many times and record the result, for a range of parameter values
+- detect whether you recover the effect of interest consistently (e.g. >80% of the time), for any given case, and how inflated your significant effects will be.
+
+
+We can do much of this simulation work using faux's `sim_design` function. For example, a between subjects t.test would be built as follows:
+
+```{r}
+
+smarterpets <- sim_design(
+  n=100,
+  between = list(pet = c("cat", "dog")),
+  mu = c(105,100),
+  sd = c(10,10),
+  dv = "iq"
+)
+
+head(totest)
+```
+
+
+```{r}
+t.test(iq~pet,data=totest)
+
+```
+
+While a wthin-subjects design would look like this:
+
+```{r}
+
+growth <- sim_design(
+  n=100,
+  within = list(time = c("pre", "post")),
+  mu = c(90,100),
+  sd = c(20,20),
+  dv = "cm",
+  long=TRUE
+)
+
+#paired t.test or within-subjects anova recovers the same p.value:
+
+t.test(cm ~ time, data=growth, paired = TRUE)
+aov_4(cm ~ (time | id), data=growth)
+```
+
+Factorial designs
+
+Moving up a level, let's take a look at simulating our power to detect an interaction effect in a 2*2 factorial design using an ANOVA
+
+```{r}
+pettime100 <- sim_design(
+  within = list(time = c("pre", "post")),
+  between = list(pet = c("cat", "dog")),
+  n = c(50),
+  mu = data.frame(
+    pre = c(1, 1.2),
+    post = c(1.2, 1.4),
+    row.names = c("cat", "dog")
+  ),
+  sd = 1,
+  id = "pet_id",
+  dv = "score",
+  r = 0.5,
+  long = TRUE,
+  rep = 100
+)
+
+analyse <- function(data){
+  
+  a <- aov_4(score ~ pet * (time | pet_id),data=data)
+  
+    # return anova_table for GG-corrected DF
+    as_tibble(a$anova_table, rownames = "term") %>% 
+    mutate(term = factor(term, levels = term))  %>%  # keeps terms in order
+    rename(p.value = `Pr(>F)`) # fixes annoying p.value name
+}
+
+pettime_sim <- map_df(pettime100$data,analyse)
+
+pettime_sim |>
+  group_by(term) |>
+  summarise(power = mean(p.value < 0.05),
+            mean_pes = mean(pes),
+            .groups = "drop")
+```
+
+
+
+
+
+```{r}
+
+sample_sizes = seq(50,100,10)
+
+create_dfs <- function(n){
+  
+  pettime100 <- sim_design(
+  within = list(time = c("pre", "post")),
+  between = list(pet = c("cat", "dog")),
+  n = c(n,n),
+  mu = data.frame(
+    pre = c(1, 1.2),
+    post = c(1.2, 1.4),
+    row.names = c("cat", "dog")
+  ),
+  sd = .7,
+  id = "pet_id",
+  dv = "score",
+  r = 0.5,
+  long = TRUE,
+  rep = 1000
+)
+
+analyse <- function(data){
+  
+  a <- aov_4(score ~ pet * (time | pet_id),data=data)
+  
+    # return anova_table for GG-corrected DF
+    as_tibble(a$anova_table, rownames = "term") %>% 
+    mutate(term = factor(term, levels = term))  %>%  # keeps terms in order
+    rename(p.value = `Pr(>F)`) # fixes annoying p.value name
+}
+
+pettime_sim <- map_df(pettime100$data,analyse)
+
+pettime_sim |>
+  group_by(term) |>
+  summarise(power = mean(p.value < 0.05),
+            mean_pes = mean(pes),
+            .groups = "drop") %>% 
+  mutate(sample_size=n)
+}
+
+sims <- map_df(sample_sizes,create_dfs)
+
+```
+
+
+```{r}
+sims %>% ggplot(
+  aes(
+    y=power, 
+    x = sample_size, 
+    color=term)
+  ) + 
+  geom_point() +
+  geom_line()
+```
+
+
+
