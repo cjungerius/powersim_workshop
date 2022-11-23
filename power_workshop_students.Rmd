@@ -204,7 +204,7 @@ t.test(iq~pet,data=smarterpets)
 aov_4(iq~pet+(1|id), data=smarterpets)
 ```
 
-While a wthin-subjects design would look like this:
+While a within-subjects design would look like this:
 
 ```{r}
 
@@ -228,13 +228,35 @@ Factorial designs
 Moving up a level, let's take a look at simulating our power to detect an interaction effect in a 2*2 factorial design using an ANOVA
 
 ```{r}
+pettime <- sim_design(
+  within = list(time = c("pre", "post")),
+  between = list(pet = c("cat", "dog")),
+  n = #?,
+  mu = data.frame(
+    pre = #?,
+    post = #?,
+    row.names = c("cat", "dog")
+  ),
+  sd = 1,
+  id = "pet_id",
+  dv = "score",
+  r = 0.5,
+  long = TRUE
+)
+
+
+```
+
+...And we can use faux's "rep" argument to repeat this dataframe many times and perform analysis on each generated dataframe
+
+```{r}
 pettime100 <- sim_design(
   within = list(time = c("pre", "post")),
   between = list(pet = c("cat", "dog")),
-  n = c(50),
+  n = #?,
   mu = data.frame(
-    pre = c(1, 1.2),
-    post = c(1.2, 1.4),
+    pre = #?,
+    post = #?,
     row.names = c("cat", "dog")
   ),
   sd = 1,
@@ -257,20 +279,18 @@ analyse <- function(data){
 
 pettime_sim <- map_df(pettime100$data,analyse)
 
-pettime_sim |>
-  group_by(term) |>
+pettime_sim  %>% 
+  group_by(term)  %>% 
   summarise(power = mean(p.value < 0.05),
             mean_pes = mean(pes),
             .groups = "drop")
 ```
 
-
-
-
+And expand THAT to generate dataframes with different properties simultaneously
 
 ```{r}
 
-sample_sizes = seq(20,60,10)
+sample_sizes = seq(#?)
 
 create_dfs <- function(n){
   
@@ -326,6 +346,11 @@ sims %>% ggplot(
   geom_point() +
   geom_line()
 ```
+
+```{r}
+
+```
+
 
 
 

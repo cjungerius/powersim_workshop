@@ -7,6 +7,7 @@ output: html_notebook
 ```{r}
 library(tidyverse)
 library(lme4)
+library(broom)
 ```
 
 
@@ -16,7 +17,7 @@ df1 <- tibble(
 ) %>%  
   rowwise %>% 
   mutate(
-    sample_m = mean(rnorm(10,mu))
+    sample_m = mean(rnorm(5,mu))
   )
 
 df1 %>% ggplot(
@@ -195,11 +196,11 @@ df5 %>% ggplot(
 
 ```{r}
 df6 <- tibble(
-  n = rep(c(5, 7, 10),2000)
+  n = rep(seq(7, 15),2000)
 ) %>%  
   rowwise %>% 
   mutate(
-    tidy(t.test(rnorm(n), mu=1))
+    tidy(t.test(rnorm(n,mean=1)))
   ) 
   
 ```
