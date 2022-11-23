@@ -31,9 +31,9 @@ Let's start with the basics:
 rnorm generates a sample from a population with a given mean and standard deviation. For example, to draw 100 samples from a population with mean 6 and sd 2:
 
 ```{r}
-n <- #?
-mu <- #?
-sigma <- #?
+n <- #number of samples?
+mu <- #population mean?
+sigma <- #population sd?
   
 sample = rnorm(n, mu, sigma)
 mean(sample)
@@ -43,6 +43,7 @@ sd(sample)
 We can also run statistics on these samples - for example, a one-sided t.test to test whether our sample is likely to come from a population with mu = 0
 
 ```{r}
+#We use tidy here and elsewhere to clean up test summaries and coerce them to dataframes. Try leaving out the %>% tidy part and see what the data looks like then.
 t.test(sample) %>% tidy
 ```
 Or a two-sided t.test to test whether two samples are likely to come from the same population
@@ -98,52 +99,88 @@ nreps = 1000
 #crossing creates a dataframe with all combinations of parameters provided. In the case below, that means it simply repeats all parameters nrep times
 params <- crossing(
   rep = seq(nreps),
-  n = 30,
+  n = 10,
   mu = .5,
   sigma = 1
 ) %>% 
   select(-rep) #we only needed rep to create our big dataframe, but we don't need it as function input. Therefore here drop it from the params dataframe.
 
 sims <- pmap_df(params,draw_and_test) #pmap_df maps a function (draw_and_test in our case) to all rows of a dataframe (params) and outputs the result as another dataframe. Neat!
-head(sims)
+tidy(sims)
 ```
 
-
+Let's inspect our simulations visually:
 
 ```{r}
+#We feed our dataframe into a ggplot object, to which we then add the geometries we want to use to represent our data.
+sims %>% 
+  #the basic object
+  ggplot(
+    aes(
+      #the aesthetics, i.e. the columns we care about
+      x = estimate
+      )
+  ) +
+  #and now we add geometries! In this case, only a density plot of the means we found:
+  geom_density() 
+  #you can try changing it to another method to represent this, such as geom_histogram or geom_boxplot!
+```
+Or we can plot the p-values
+```{r}
+
 sims %>% 
   ggplot(
     aes(
-      x = p.value,
-      color = as.factor(mu)
+      x = #? which column of the dataframe should we put here?
       )
   ) +
+  #first a density plot of the p values:
   geom_density() +
+  #and a vertical line to represent the alpha=0.05 significance cutoff
   geom_vline(
     xintercept = .05,
     linetype = "dashed"
   )
-
 ```
+
+We can also quantify our power numerically by seeing which percentage of our tests reached significance:
 ```{r}
 sims %>% 
-  group_by(mu) %>% 
   summarise(
     power = mean(p.value < .05)
   )
 ```
+And see if the effect estimate of the tests that reached significance is inflated (if your power is low, this will definitely be the case)
 ```{r}
 sims %>% 
-  group_by(mu) %>% 
   filter(p.value < .05) %>% 
-  summarise(d = mean(estimate))
+  summarise(d = mean(#?of which column of the dataframe?))
 ```
 So this already demonstrates the basics:
 
 - generate a sample from a virtual population
 - perform your statistical test of choice
-- repeat many times and record the result, for a range of parameter values
+- repeat many times and record the result
 - detect whether you recover the effect of interest consistently (e.g. >80% of the time), for any given case, and how inflated your significant effects will be.
+
+
+Of course, there's no reason to only test a single parameter value at a time. The same technique holds for a range of parameter values:
+
+```{r}
+nreps = 1000
+
+#crossing creates a dataframe with all combinations of parameters provided. In the case below, that means it simply repeats all parameters nrep times
+params <- crossing(
+  rep = seq(nreps),
+  n = 10,
+  mu = .5,
+  sigma = 1
+) %>% 
+  select(-rep) #we only needed rep to create our big dataframe, but we don't need it as function input. Therefore here drop it from the params dataframe.
+
+sims <- pmap_df(params,draw_and_test) #pmap_df maps a function (draw_and_test in our case) to all rows of a dataframe (params) and outputs the result as another dataframe. Neat!
+tidy(sims)
+```
 
 
 We can do much of this simulation work using faux's `sim_design` function. For example, a between subjects t.test would be built as follows:
