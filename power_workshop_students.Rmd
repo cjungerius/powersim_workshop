@@ -228,7 +228,7 @@ Factorial designs
 Moving up a level, let's take a look at simulating our power to detect an interaction effect in a 2*2 factorial design using an ANOVA
 
 ```{r}
-pettime <- sim_design(
+pethappy <- sim_design(
   within = list(time = c("pre", "post")),
   between = list(pet = c("cat", "dog")),
   n = #?,
@@ -239,7 +239,7 @@ pettime <- sim_design(
   ),
   sd = 1,
   id = "pet_id",
-  dv = "score",
+  dv = "happiness",
   r = 0.5,
   long = TRUE
 )
@@ -250,7 +250,7 @@ pettime <- sim_design(
 ...And we can use faux's "rep" argument to repeat this dataframe many times and perform analysis on each generated dataframe
 
 ```{r}
-pettime100 <- sim_design(
+pethappy100 <- sim_design(
   within = list(time = c("pre", "post")),
   between = list(pet = c("cat", "dog")),
   n = #?,
@@ -269,7 +269,7 @@ pettime100 <- sim_design(
 
 analyse <- function(data){
   
-  a <- aov_4(score ~ pet * (time | pet_id),data=data)
+  a <- aov_4(happiness ~ pet * (time | pet_id),data=data)
   
     # return anova_table for GG-corrected DF
     as_tibble(a$anova_table, rownames = "term") %>% 
@@ -277,9 +277,9 @@ analyse <- function(data){
     rename(p.value = `Pr(>F)`) # fixes annoying p.value name
 }
 
-pettime_sim <- map_df(pettime100$data,analyse)
+pethappy_sim <- map_df(pethappy100$data,analyse)
 
-pettime_sim  %>% 
+pethappy_sim  %>% 
   group_by(term)  %>% 
   summarise(power = mean(p.value < 0.05),
             mean_pes = mean(pes),
@@ -294,7 +294,7 @@ sample_sizes = seq(#?)
 
 create_dfs <- function(n){
   
-  pettime100 <- sim_design(
+  pethappy100 <- sim_design(
   within = list(time = c("pre", "post")),
   between = list(pet = c("cat", "dog")),
   n = c(n,n),
@@ -305,7 +305,7 @@ create_dfs <- function(n){
   ),
   sd = 1,
   id = "pet_id",
-  dv = "score",
+  dv = "happiness",
   r = 0.5,
   long = TRUE,
   rep = 1000
@@ -313,7 +313,7 @@ create_dfs <- function(n){
 
 analyse <- function(data){
   
-  a <- aov_4(score ~ pet * (time | pet_id),data=data)
+  a <- aov_4(happiness ~ pet * (time | pet_id),data=data)
   
     # return anova_table for GG-corrected DF
     as_tibble(a$anova_table, rownames = "term") %>% 
@@ -321,9 +321,9 @@ analyse <- function(data){
     rename(p.value = `Pr(>F)`) # fixes annoying p.value name
 }
 
-pettime_sim <- map_df(pettime100$data,analyse)
+pethappy_sim <- map_df(pethappy100$data,analyse)
 
-pettime_sim |>
+pethappy_sim |>
   group_by(term) |>
   summarise(power = mean(p.value < 0.05),
             mean_pes = mean(pes),
