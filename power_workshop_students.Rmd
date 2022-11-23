@@ -23,7 +23,7 @@ Before we begin, we can set a seed so the outcome of our random number generator
 ```{r}
 set.seed(90059)
 x <- rnorm(1)
-x
+
 ```
 
 
@@ -31,9 +31,9 @@ Let's start with the basics:
 rnorm generates a sample from a population with a given mean and standard deviation. For example, to draw 100 samples from a population with mean 6 and sd 2:
 
 ```{r}
-n <- 100
-mu <- 6
-sigma <- 2
+n <- #?
+mu <- #?
+sigma <- #?
   
 sample = rnorm(n, mu, sigma)
 mean(sample)
@@ -48,13 +48,13 @@ t.test(sample) %>% tidy
 Or a two-sided t.test to test whether two samples are likely to come from the same population
 
 ```{r}
+
 sample2 = rnorm(
-  100,
-  7,
-  2
+  #?
   )
 t.test(sample,sample2) %>% tidy
 ```
+
 We can combine our sampling from a given population and testing (one-sided for now) into a function for convenience:
 
 ```{r}
@@ -64,18 +64,28 @@ draw_and_test <- function(
   sigma=1
 ){
   
-  sample <- rnorm(n,mu,sigma)
-  result <- tidy(t.test(sample)) %>% 
-    select(estimate, p.value) %>% 
-    mutate(
+  sample <- #how do we generate a sample?
+  
+  
+  result <- #how do we perform a t.test?
+  
+  
+  #once we have a result, we use a 'pipeline' of verbs to modify it for our purposes:
+  result <- result %>%  #input
+    tidy %>%            #coerce it to a dataframe
+    select(estimate,    #keep only the columns we care about
+           p.value) %>% 
+    mutate(             #add new columns to the dataframe to save the parameters we used
       n=n,
       mu=mu,
       sigma=sigma
     )
+  
   return(result)
 }
 
-draw_and_test(10,1,1)
+#let's try our function! Feel free to change these values and see the different results
+draw_and_test(100,1,.5)
 
 ```
 
@@ -85,15 +95,17 @@ Cool. but what if I want to run, like, 1000 t.tests on samples drawn from a popu
 ```{r}
 nreps = 1000
 
+#crossing creates a dataframe with all combinations of parameters provided. In the case below, that means it simply repeats all parameters nrep times
 params <- crossing(
   rep = seq(nreps),
   n = 30,
-  mu = seq(.1,.5,.1),
+  mu = .5,
   sigma = 1
 ) %>% 
-  select(-rep)
+  select(-rep) #we only needed rep to create our big dataframe, but we don't need it as function input. Therefore here drop it from the params dataframe.
 
-sims <- pmap_df(params,draw_and_test)
+sims <- pmap_df(params,draw_and_test) #pmap_df maps a function (draw_and_test in our case) to all rows of a dataframe (params) and outputs the result as another dataframe. Neat!
+head(sims)
 ```
 
 
